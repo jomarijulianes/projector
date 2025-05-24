@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Projector Reservation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0; background-color: #f4f4f9; margin-top: 80px;
+    }
+    .header {
+      background-color: #0D47A1;
+      color: white;
+      padding: 15px 30px;
+      display: flex; justify-content: center; align-items: center;
+      position: fixed; top: 0; left: 0; width: 100%; z-index: 10;
+    }
+    .header h1 {
+      margin: 0; font-size: 28px;
+    }
+    .container {
+      width: 95%;
+      margin: 0 auto;
+      margin-top: 100px;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      user-select: none;
+    }
+    th {
+      background-color: #0D47A1;
+      color: white;
+    }
+    td.available {
+      background-color: #b8e4b8;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    td.available:hover {
+      background-color: #a3d79d;
+    }
+    td.reserved {
+      font-weight: bold;
+      color: white;
+      cursor: default;
+    }
+    td.selected {
+      background-color: #4CAF50 !important;
+      color: white;
+    }
+    input, select {
+      padding: 10px;
+      width: 250px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+    button {
+      background-color: #0D47A1;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-weight: bold;
+      font-size: 16px;
+      width: 250px;
+    }
+    button:hover {
+      background-color: #1565C0;
+    }
+    .link-to-admin {
+      margin-top: 15px;
+      font-size: 14px;
+    }
+    .link-to-admin a {
+      color: #0D47A1;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .link-to-admin a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>PROJECTOR RESERVATION</h1>
+  </div>
+
+  <div class="container">
+    <table id="reservationTable">
+      <thead>
+        <tr id="tableHeader">
+          <th>TIME</th>
+          <!-- Projector columns added dynamically -->
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <input type="text" id="userName" placeholder="Enter your name" required />
+    <select id="userCategory">
+      <option value="SHS">SHS</option>
+      <option value="Tertiary">Tertiary</option>
+    </select>
+
+    <button id="reserveBtn">Reserve Selected Slots</button>
+
+    <p style="margin: 10px 0; font-size: 14px;">
+      * Click on available cells to select/deselect multiple time slots. Then click "Reserve Selected Slots".
+    </p>
+
+    <div class="link-to-admin">
+      <a href="admin.html" target="_blank">Go to Admin Panel</a>
+    </div>
+  </div>
+
+  <script>
+     console.log('reservations in localStorage:', localStorage.getItem('reservations'));
+    console.log('projectors in localStorage:', localStorage.getItem('projectors'));
+    
+    const STORAGE_KEYS = {
+      projectors: 'projectors',
+      reservations: 'reservations'
+    };
+
+    const timeSlots = [
+      '7:00 - 7:30 AM', '7:30 - 8:00 AM', '8:00 - 8:30 AM', '8:30 - 9:00 AM',
+      '9:00 - 9:30 AM', '9:30 - 10:00 AM', '10:00 - 10:30 AM', '10:30 - 11:00 AM',
+      '11:00 - 11:30 AM', '11:30 - 12:00 PM', '12:00 - 12:30 PM', '12:30 - 1:00 PM',
+      '1:00 - 1:30 PM', '1:30 - 2:00 PM', '2:00 - 2:30 PM', '2:30 - 3:00 PM',
+      '3:00 - 3:30 PM', '3:30 - 4:00 PM', '4:00 - 4:30 PM', '4:30 - 5:00 PM',
+      '5:00 - 5:30 PM', '5:30 - 6:00 PM', '6:00 - 6:30 PM', '6:30 - 7:00 PM',
+      '7:00 - 7:30 PM', '7:30 - 8:00 PM'
+    ];
+
+    let projectors = JSON.parse(localStorage.getItem(STORAGE_KEYS.projectors));
+    if (!projectors || !Array.isArray(projectors) || projectors.length === 0) {
+      projectors = [1, 2, 3, 4, 5];
+      localStorage.setItem(STORAGE_KEYS.projectors, JSON.stringify(projectors));
+    }
+
+    let reservations = JSON.parse(localStorage.getItem(STORAGE_KEYS.reservations));
+    if (!reservations || typeof reservations !== 'object') {
+      reservations = {};
+      timeSlots.forEach(time => {
+        reservations[time] = Array(projectors.length).fill('');
+      });
+      localStorage.setItem(STORAGE_KEYS.reservations, JSON.stringify(reservations));
+    } else {
+      // Fix length if projectors changed
+      timeSlots.forEach(time => {
+        if (!reservations[time]) {
+          reservations[time] = Array(projectors.length).fill('');
+        } else if (reservations[time].length < projectors.length) {
+          const diff = projectors.length - reservations[time].length;
+          reservations[time] = reservations[time].concat(Array(diff).fill(''));
+        } else if (reservations[time].length > projectors.length) {
+          reservations[time] = reservations[time].slice(0, projectors.length);
+        }
+      });
+      localStorage.setItem(STORAGE_KEYS.reservations, JSON.stringify(reservations));
+    }
+
+    // Track selected slots: array of {time, projectorIndex}
+    let selectedSlots = [];
+
+    function renderTableHeader() {
+      const headerRow = document.getElementById('tableHeader');
+      headerRow.innerHTML = '<th>TIME</th>';
+      projectors.forEach(num => {
+        const th = document.createElement('th');
+        th.textContent = `PROJECTOR #${num}`;
+        headerRow.appendChild(th);
+      });
+    }
+
+    function renderTableBody() {
+      const tbody = document.querySelector('#reservationTable tbody');
+      tbody.innerHTML = '';
+
+      timeSlots.forEach(time => {
+        const tr = document.createElement('tr');
+
+        const timeCell = document.createElement('td');
+        timeCell.textContent = time;
+        tr.appendChild(timeCell);
+
+        reservations[time].forEach((res, idx) => {
+          const td = document.createElement('td');
+          if (res) {
+            // Reserved slot
+            const match = res.match(/(.+?) \((.+)\)/);
+            let name = res;
+            let category = '';
+            if (match) {
+              name = match[1];
+              category = match[2];
+            }
+            let bgColor = '#888';
+            if (category === 'SHS') bgColor = '#66BB6A';
+            else if (category === 'Tertiary') bgColor = '#D7A0A0';
+
+            td.textContent = res;
+            td.classList.add('reserved');
+            td.style.backgroundColor = bgColor;
+            td.style.cursor = 'default';
+          } else {
+            td.textContent = 'Available';
+            td.classList.add('available');
+            td.style.cursor = 'pointer';
+
+            // Check if selected
+            const selected = selectedSlots.some(s => s.time === time && s.idx === idx);
+            if (selected) {
+              td.classList.add('selected');
+            }
+
+            td.onclick = () => toggleSelectSlot(time, idx);
+          }
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleSelectSlot(time, idx) {
+      // Check if already reserved
+      if (reservations[time][idx]) {
+        alert('This slot is already reserved.');
+        return;
+      }
+
+      const index = selectedSlots.findIndex(s => s.time === time && s.idx === idx);
+      if (index >= 0) {
+        // Deselect
+        selectedSlots.splice(index, 1);
+      } else {
+        // Select
+        selectedSlots.push({ time, idx });
+      }
+      renderTableBody();
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEYS.reservations, JSON.stringify(reservations));
+      localStorage.setItem(STORAGE_KEYS.projectors, JSON.stringify(projectors));
+    }
+
+    document.getElementById('reserveBtn').onclick = () => {
+      const nameInput = document.getElementById('userName');
+      const categorySelect = document.getElementById('userCategory');
+      const name = nameInput.value.trim();
+      const category = categorySelect.value;
+
+      if (!name) {
+        alert('Please enter your name before reserving.');
+        return;
+      }
+
+      if (selectedSlots.length === 0) {
+        alert('Please select at least one time slot to reserve.');
+        return;
+      }
+
+      // Double check if selected slots are still available before reserving
+      for (const {time, idx} of selectedSlots) {
+        if (reservations[time][idx]) {
+          alert(`Slot at ${time} for projector #${idx + 1} was just reserved by someone else. Please reselect.`);
+          // Clear selection and refresh
+          selectedSlots = [];
+          renderTableBody();
+          return;
+        }
+      }
+
+      selectedSlots.forEach(({time, idx}) => {
+        reservations[time][idx] = `${name} (${category})`;
+      });
+
+      saveToStorage();
+      renderTableBody();
+
+      alert(`Reserved ${selectedSlots.length} slot(s) successfully for ${name} (${category}).`);
+
+      selectedSlots = [];
+      nameInput.value = '';
+    };
+
+    renderTableHeader();
+    renderTableBody();
+
+    // Sync on storage change (if admin adds projector or other reservations change)
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEYS.projectors || e.key === STORAGE_KEYS.reservations) {
+        projectors = JSON.parse(localStorage.getItem(STORAGE_KEYS.projectors)) || projectors;
+        reservations = JSON.parse(localStorage.getItem(STORAGE_KEYS.reservations)) || reservations;
+
+        // Fix length if projectors changed
+        timeSlots.forEach(time => {
+          if (!reservations[time]) {
+            reservations[time] = Array(projectors.length).fill('');
+          } else if (reservations[time].length < projectors.length) {
+            const diff = projectors.length - reservations[time].length;
+            reservations[time] = reservations[time].concat(Array(diff).fill(''));
+          } else if (reservations[time].length > projectors.length) {
+            reservations[time] = reservations[time].slice(0, projectors.length);
+          }
+        });
+        saveToStorage();
+
+        selectedSlots = [];
+        renderTableHeader();
+        renderTableBody();
+      }
+    });
+  </script>
+</body>
+</html>
